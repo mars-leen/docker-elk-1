@@ -1,0 +1,20 @@
+#=========================== Filebeat inputs =============================
+filebeat.inputs:
+  # 收集nginx日志
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/nginx/access.log
+    # 日志是json开启这个
+    json.keys_under_root: true
+    json.overwrite_keys: true
+    json.add_error_key: true
+
+#-------------------------- Redis output ------------------------------
+output.redis:
+  hosts: ["192.168.1.106:28080"]   #输出到redis的机器
+  password: "MCm)@wFpS5mzt=@,"
+  key: "nginx_logs"   #redis中日志数据的key值ֵ
+  db: 0
+  timeout: 5
+

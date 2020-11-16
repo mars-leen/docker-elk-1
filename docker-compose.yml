@@ -19,38 +19,12 @@ services:
       - "9300:9300"
     environment:
       ES_JAVA_OPTS: "-Xmx256m -Xms256m"
-      ELASTIC_PASSWORD: changeme
+      ELASTIC_PASSWORD:  MCm)@wFpS5mzt=@,
       # Use single node discovery in order to disable production mode and avoid bootstrap checks.
       # see: https://www.elastic.co/guide/en/elasticsearch/reference/current/bootstrap-checks.html
       discovery.type: single-node
     networks:
       - elk
-
-  logstash:
-    build:
-      context: logstash/
-      args:
-        ELK_VERSION: $ELK_VERSION
-    volumes:
-      - type: bind
-        source: ./logstash/config/logstash.yml
-        target: /usr/share/logstash/config/logstash.yml
-        read_only: true
-      - type: bind
-        source: ./logstash/pipeline
-        target: /usr/share/logstash/pipeline
-        read_only: true
-    ports:
-      - "5044:5044"
-      - "5000:5000/tcp"
-      - "5000:5000/udp"
-      - "9600:9600"
-    environment:
-      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
-    networks:
-      - elk
-    depends_on:
-      - elasticsearch
 
   kibana:
     build:
@@ -68,6 +42,92 @@ services:
       - elk
     depends_on:
       - elasticsearch
+
+  redis:
+    image: redis:5.0.0
+    container_name: redis
+    command: redis-server --requirepass MCm)@wFpS5mzt=@,
+    ports:
+      - "28080:6379"
+    volumes:
+      - ./data:/data
+
+  logstash:
+    build:
+      context: logstash/
+      args:
+        ELK_VERSION: $ELK_VERSION
+    volumes:
+      - type: bind
+        source: ./logstash/config/logstash.yml
+        target: /usr/share/logstash/config/logstash.yml
+        read_only: true
+      - type: bind
+        source: ./logstash/pipeline
+        target: /usr/share/logstash/pipeline
+        read_only: true
+      - type: bind
+        source: ./logstash/Geoip/GeoLite2-City.mmdb
+        target: /usr/share/logstash/GeoLite2-City.mmdb
+        read_only: true
+    ports:
+      - "5044:5044"
+      - "5000:5000/tcp"
+      - "5000:5000/udp"
+      - "9600:9600"
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      - elk
+    depends_on:
+      - redis
+      - elasticsearch
+
+
+  filebeat:
+    user: root
+    build:
+      context: filebeat/
+      args:
+        ELK_VERSION: $ELK_VERSION
+    links:
+      - logstash:logstash
+    depends_on:
+      - redis
+      - logstash
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /host_docker/docker.sock
+        read_only: true
+      - type: bind
+        source: /var/lib/docker
+        target: /host_docker/var/lib/docker
+        read_only: true
+      - type: bind
+        source: /var/log/nginx
+        target: /usr/share/filebeat/mylog
+        read_only: true
+      - type: bind
+        source: ./filebeat/config/filebeat.yml
+        target: /usr/share/filebeat/filebeat.yml
+        read_only: true
+    command: ["--strict.perms=false"]
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    stdin_open: true
+    tty: true
+    networks:
+      - elk
+    deploy:
+      mode: global
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "50"
 
 networks:
   elk:
